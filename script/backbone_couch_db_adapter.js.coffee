@@ -84,6 +84,7 @@ class @CouchQueryAdapter
 
   view: (model, opts) ->
     _opts = @make_options(model.__proto__)
+    _opts = @user_filter(_opts, model.__proto__.filters)
     url = @get_view_url(model.__proto__.view)
     params =
       data: _opts
@@ -98,14 +99,22 @@ class @CouchQueryAdapter
     opts.complete()
 
   get_view_url: (view) ->
-    "/_design/#{db.name}/_view/#{view}"
+    "_design/#{db.name}/_view/#{view}"
 
 
   make_options: (opts) ->
     _opts = {}
     for option in @options()
-      if opts[option]?
+      if opts[option]
         _opts[option] = opts[option]
+    _opts
+
+  user_filter: (_opts, opts) ->
+    if opts
+      for k,v of opts
+        _opts[k] = v if v
+    _opts
+
 
   options: ->
     [
@@ -121,7 +130,6 @@ class @CouchQueryAdapter
       "skip"
       "group"
       "group_level"
-      "reduce"
       "include_docs"
       "inclusive_end"
       "update_seq"
