@@ -43,39 +43,43 @@ class Backbone.Model extends Backbone.Model
     new_model
 
 class @CouchQueryAdapter
-  constructor: ->
+  constructor: (@db)->
     self = @
 
   query: (model, opts) ->
-    _opts = @make_options(model.__proto__)
+    _opts = @make_options(model.constructor.prototype)
 
   query_model: (model, opts) ->
-    _opts = @make_options(model.__proto__)
+    _opts = @make_options(model.constructor.prototype)
 
   get_model: (model, opts)->
-    db.get(model.id, (resp) =>
+    @db.get(model.id, (resp) =>
       opts.success resp
       opts.complete()
     )
 
   update_model: (model, opts) ->
+    @before_save(model)
     vals =  model.toJSON()
-    db.put(model.id, vals, (doc) ->
+
+    @db.put(model.id, vals, (doc) ->
       opts.success({_id: doc.id, _rev: doc.rev})
       opts.complete()
     )
 
   create_model: (model, opts)->
+    @before_save(model)
     vals = model.toJSON()
-    db.post(vals, (doc) ->
+    @db.post(vals, (doc) ->
       opts.success({_id: doc.id, _rev: doc.rev})
       opts.complete()
     )
 
   delete_model: (model, opts) ->
-    db.destroy(model.id, { rev: model.rev }, (doc) ->
-      opts.success()
-    )
+    if model.rev
+      @db.destroy(model.id, { rev: model.rev }, (doc) ->
+        opts.success()
+      )
 
   #  copy: ->
   #    db.copy('some-record', 'new-record', { rev: 'abcdef123456789' }, (resp) ->
@@ -83,23 +87,28 @@ class @CouchQueryAdapter
   #    )
 
   view: (model, opts) ->
-    _opts = @make_options(model.__proto__)
-    _opts = @user_filter(_opts, model.__proto__.filters)
-    url = @get_view_url(model.__proto__.view)
+    _opts = @make_options(model.constructor.prototype)
+    _opts = @user_filter(_opts, model.constructor.prototype.filters)
+    url = @get_view_url(model.constructor.prototype.view, model.constructor.prototype.view_url)
+    url += "?#{$.param(_opts)}"
     params =
-      data: _opts
-      callback: ((res) => @view_collback(res, opts))
-    db.request(url,params)
+#      data: _opts
+      callback: ((res) => (if model.constructor.prototype.read_collback then model.constructor.prototype.read_collback(res, opts) else @view_collback(res, opts)))
+    @db.request(url,params)
 
   view_collback: (res, opts) ->
     _temp = []
     for doc in res.rows
-      if doc.value then _temp.push doc.value else _temp.push doc.doc
+      if doc.value
+        _temp.push doc.value
+      else
+        _temp.push doc.doc
     opts.success _temp
     opts.complete()
 
-  get_view_url: (view) ->
-    "_design/#{db.name}/_view/#{view}"
+  get_view_url: (view, url) ->
+    url = "_design/#{@db.name}/_view/#{view}" unless url
+    url
 
 
   make_options: (opts) ->
@@ -114,6 +123,9 @@ class @CouchQueryAdapter
       for k,v of opts
         _opts[k] = v if v
     _opts
+
+  before_save: (model) ->
+    model.before_save() if model.before_save
 
 
   options: ->
@@ -138,10 +150,10 @@ class @CouchQueryAdapter
 
 
 class @BackBoneCouchDbAdapter
-  constructor: ->
-    @sync()
-    @adapter = new CouchQueryAdapter()
-    window.ad = @adapter
+  constructor: (@db) ->
+#    @sync()
+    @adapter = new CouchQueryAdapter(@db)
+    this
 
   read: (model, opts) ->
     if model.models
@@ -170,11 +182,10 @@ class @BackBoneCouchDbAdapter
       opts.success ?= ->
       opts.error ?= ->
       opts.complete ?= ->
-
+      if model.constructor.prototype.adapter
+        self = model.constructor.prototype.adapter
       switch method
         when "read" then self.read model, opts
         when "create" then self.create model, opts
         when "update" then self.update model, opts
         when "delete" then self.del model, opts
-
-
