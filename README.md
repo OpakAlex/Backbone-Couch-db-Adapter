@@ -8,7 +8,7 @@ https://github.com/benvinegar/couchdb-xd
 
 add Couch.init in your js code
 example:
-class CounchInit
+    class CounchInit
   constructor: (@host, @user, pass) ->
     @user = window.gon.current_user unless @user #{login: 'login', name: 'I am'} #if use gon
     Couch.init ->
@@ -18,7 +18,7 @@ class CounchInit
       PlayerApp.appView = new PlayerApp.AppView collection: new PlayerApp.PlayListCollection
 
 Then, update your backbone collections:
-class ExampleApp.ExampleList extends Backbone.Collection
+    class ExampleApp.ExampleList extends Backbone.Collection
   view: 'your view'
   model: ExampleApp.Example
   url: '#'
